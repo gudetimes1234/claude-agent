@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 
-export default function ChatInterface() {
+export default function ChatInterface({ selectedRepository }) {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState('chat'); // 'chat' or 'git'
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -25,12 +26,24 @@ export default function ChatInterface() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/chat', {
+      // Use enhanced API if repository is selected and mode is git
+      const apiEndpoint = (selectedRepository && mode === 'git') ? '/api/claude-git' : '/api/chat';
+      
+      const requestBody = {
+        message: messageToSend,
+        operation: mode,
+        ...(selectedRepository && mode === 'git' && {
+          repository: selectedRepository,
+          githubToken: localStorage.getItem('github_token') // We'll store this temporarily
+        })
+      };
+
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: messageToSend }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();
@@ -70,7 +83,15 @@ export default function ChatInterface() {
             <div className="welcome-message">
               <div className="welcome-content">
                 <h2>👋 Hello!</h2>
-                <p>I'm Claude, your AI assistant. Ask me anything!</p>
+                <p>I'm Claude, your AI assistant.</p>
+                {selectedRepository ? (
+                  <div className="welcome-repo">
+                    <p>🎯 Working with: <strong>{selectedRepository.name}</strong></p>
+                    <p>Switch to Git mode to create files and make commits!</p>
+                  </div>
+                ) : (
+                  <p>Ask me anything or create a repository to get started!</p>
+                )}
               </div>
             </div>
           )}
@@ -106,13 +127,45 @@ export default function ChatInterface() {
         </div>
       </div>
       
+      {selectedRepository && (
+        <div className="mode-toggle">
+          <div className="mode-buttons">
+            <button
+              type="button"
+              onClick={() => setMode('chat')}
+              className={`mode-button ${mode === 'chat' ? 'active' : ''}`}
+            >
+              💬 Chat Mode
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('git')}
+              className={`mode-button ${mode === 'git' ? 'active' : ''}`}
+            >
+              🔧 Git Mode
+            </button>
+          </div>
+          <div className="mode-info">
+            {mode === 'chat' ? (
+              <span>General conversation with Claude</span>
+            ) : (
+              <span>Claude can create/modify files in {selectedRepository.name}</span>
+            )}
+          </div>
+        </div>
+      )}
+      
       <form onSubmit={sendMessage} className="input-form">
         <div className="input-container">
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Message Claude..."
+            placeholder={
+              selectedRepository && mode === 'git' 
+                ? `Tell Claude what to build in ${selectedRepository.name}...`
+                : "Message Claude..."
+            }
             disabled={isLoading}
             className="message-input"
             autoComplete="off"

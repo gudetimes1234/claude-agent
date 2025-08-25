@@ -1,8 +1,12 @@
 import Head from 'next/head';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import ChatInterface from '../components/ChatInterface';
+import GitHubRepoCreator from '../components/GitHubRepoCreator';
 
 export default function Home() {
+  const [repositories, setRepositories] = useState([]);
+  const [selectedRepo, setSelectedRepo] = useState(null);
+
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
@@ -15,6 +19,12 @@ export default function Home() {
         });
     }
   }, []);
+
+  const handleRepoCreated = (repository) => {
+    setRepositories(prev => [...prev, repository]);
+    setSelectedRepo(repository);
+    console.log('Repository created:', repository);
+  };
 
   return (
     <>
@@ -37,7 +47,36 @@ export default function Home() {
           <h1>Claude Agent</h1>
         </header>
         <main className="app-main">
-          <ChatInterface />
+          <div className="main-content">
+            <div className="toolbar">
+              <GitHubRepoCreator onRepoCreated={handleRepoCreated} />
+              {repositories.length > 0 && (
+                <div className="repo-selector">
+                  <select 
+                    value={selectedRepo?.name || ''} 
+                    onChange={(e) => {
+                      const repo = repositories.find(r => r.name === e.target.value);
+                      setSelectedRepo(repo);
+                    }}
+                    className="repo-select"
+                  >
+                    <option value="">Select repository...</option>
+                    {repositories.map(repo => (
+                      <option key={repo.name} value={repo.name}>
+                        {repo.name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedRepo && (
+                    <span className="repo-info">
+                      📁 {selectedRepo.name}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            <ChatInterface selectedRepository={selectedRepo} />
+          </div>
         </main>
       </div>
     </>
